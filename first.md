@@ -257,6 +257,9 @@ Our n-gram data can be used for to construct prediction model that predict next 
 We consider that it needs to be used about 3 top-frequncy n-grams of each frequent word.
 As far as we know according to the Zipf principle (1935), we should keep ~20% from top-frequent n-grams for covering at about 80% of the usual sentences (word instances). 
 
-P.S. For future prediction model building we are going to use 30%-random sample of our text corpora.
+P.S.
+
+- For future prediction model building we are going to use 30%-random sample of our text corpora.
+- RMD file with all code blocks (first.rmd) you can obtain at http://github.com/ellariel/r-capstone-swiftkey
 
 .

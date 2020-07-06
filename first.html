@@ -500,7 +500,11 @@ en_blogs_fourgram &lt;- getngrams(en_blogs_corp, FourgramTokenizer)</code></pre>
 <h1>Conclusion</h1>
 <p>So, we analyse only 10% sample (because of hardware limitations) of the entire corpus and remove numbers, punctuations, badwords, etc. from them. As we can see at figures the most frequent one-gram words are ‘one’, ‘just’, ‘said.’ In the digrams, ‘company said’, ‘right now’, and ‘even though’ are the top 3 most frequent consequitive words. In the tri-grams, ‘points national average’, ‘happy mothers day’, and ‘actions people feel’ come on top.</p>
 <p>Our n-gram data can be used for to construct prediction model that predict next word based on n-gram frequences. We consider that it needs to be used about 3 top-frequncy n-grams of each frequent word. As far as we know according to the Zipf principle (1935), we should keep ~20% from top-frequent n-grams for covering at about 80% of the usual sentences (word instances).</p>
-<p>P.S. For future prediction model building we are going to use 30%-random sample of our text corpora.</p>
+<p>P.S.</p>
+<ul>
+<li>For future prediction model building we are going to use 30%-random sample of our text corpora.</li>
+<li>RMD file with all code blocks (first.rmd) you can obtain at <a href="http://github.com/ellariel/r-capstone-swiftkey" class="uri">http://github.com/ellariel/r-capstone-swiftkey</a></li>
+</ul>
 <p>.</p>
 </div>
 
