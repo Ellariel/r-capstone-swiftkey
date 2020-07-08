@@ -1,0 +1,289 @@
+---
+title: "Text mining for SwiftKey: build dictonary"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+D.V. 07/07/20
+
+
+```{r, warning=FALSE, message=FALSE, include=FALSE}
+library(tm)
+library(stringi)
+library(dplyr)
+#Sys.setenv(JAVA_HOME="C:\\Program Files\\Java\\jdk1.8.0_251\\")
+#library(RWeka)
+#library(textmineR)
+library(data.table)
+```
+
+# Loading data and make corpora
+
+```{r, cache=TRUE, include=FALSE}
+badwords <- readLines("bad-words.txt", skipNul = TRUE, warn = FALSE)
+#http://www.freewebheaders.com/full-list-of-bad-words-banned-by-google/
+```
+
+```{r}
+remove_online_junk <- function(x){
+    # replace emails and such but space
+    x <- gsub("[^ ]{1,}@[^ ]{1,}"," ",x)
+    x <- gsub(" @[^ ]{1,}"," ",x)
+    # hashtags
+    x <- gsub("#[^ ]{1,}"," ",x) 
+    # websites and file systems
+    x <- gsub("[^ ]{1,}://[^ ]{1,}"," ",x) 
+    x}
+remove_symbols <- function(x){
+    # Edit out most non-alphabetical character
+    # text must be lower case first
+    x <- gsub("[`’‘]","'",x)
+    x <- gsub("[^a-z']"," ",x)
+    x <- gsub("'{2,}"," '",x)
+    x <- gsub("' "," ",x)
+    x <- gsub(" '"," ",x)
+    x <- gsub("^'","",x)
+    x <- gsub("'$","",x)
+    x}
+split_shortforms <- function(x){
+  short_forms <- data.frame(
+    "sub"=c("'d[^a-z]","'s[^a-z]"),
+    "rep"=c(" 'd "," 's "))
+  short_forms  <- rbind(short_forms, data.frame(
+    "sub"=c("'ll[^a-z]","'re[^a-z]","'ve[^a-z]"),
+    "rep"=c(" 'll "," 're "," 've ")))
+    # add a space in front of short forms
+    for(isf in seq(1,nrow(short_forms))){
+        x <- gsub(short_forms[isf,"sub"],short_forms[isf,"rep"],x)}
+    x}
+```
+
+
+```{r, warning=FALSE, cache=TRUE}
+#set.seed(1313)
+en_blogs <- readLines("en_US.blogs.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_blogs <- sample(en_blogs, NROW(en_blogs) * 0.1, replace = FALSE)
+```
+
+
+```{r, warning=FALSE, cache=TRUE}
+en_twitter <- readLines("en_US.twitter.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_twitter <- sample(en_twitter, NROW(en_twitter) * 0.1, replace = FALSE)
+```
+
+
+```{r, warning=FALSE, cache=TRUE}
+en_news <- readLines("en_US.news.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_news <- sample(en_news, NROW(en_news) * 0.1, replace = FALSE)
+```
+
+
+```{r, cache=TRUE, warning=FALSE}
+corp <- union(union(
+  en_blogs,
+  en_twitter),
+  en_news)
+```
+
+
+```{r, include=FALSE}
+remove(en_blogs)
+remove(en_twitter)
+remove(en_news)
+```
+
+
+```{r, cache=TRUE, warning=FALSE}
+corp <- VCorpus(VectorSource(list(corp)))#preparing corpus
+corp <- tm_map(corp, content_transformer(tolower))
+corp <- tm_map(corp, content_transformer(remove_online_junk))
+corp <- tm_map(corp, content_transformer(remove_symbols))
+corp <- tm_map(corp, content_transformer(split_shortforms))
+#corp <- tm_map(corp, removePunctuation)
+#corp <- tm_map(corp, removeWords, c(stopwords('english'), badwords))
+corp <- tm_map(corp, removeWords, badwords)
+corp <- tm_map(corp, stripWhitespace)
+corp <- tm_map(corp, PlainTextDocument)
+```
+
+```{r, eval=FALSE}
+save(corp, file = "corp.rda")
+```
+
+```{r, eval=FALSE}
+load(file = "corp.rda")
+```
+
+# Making dictonaries
+
+```{r, cache=TRUE, warning=FALSE}
+cover <- function(freq, p = 0.9) {
+    total <- sum(freq)
+    target <- total*p
+    minf <- 0.
+    maxf <- max(freq)
+    if (sum(freq[freq>=maxf])>=target)
+      {return (freq>=maxf)}
+    it     <- 0.
+    medf   <- 0.5*(minf+maxf)
+    cur    <- sum(freq[freq>=medf])/total
+    delta  <- (maxf-minf)/medf
+    error  <- cur - p
+    while(it < 100 & ((delta > 1e-3 & error > 1e-2 ) | error < 0.)){
+        it <- it+1
+        if(error > 0)
+          {minf <- medf
+        } else {maxf <- medf}
+        medf   <- 0.5*(minf+maxf)
+        delta  <- (maxf-minf)/medf
+        cur    <- sum(freq[freq>=medf])/total
+        error  <- cur - p}
+    freq>=medf}
+
+getngrams <- function (corpus, n, p = 0.9) {
+  tokenizer <- function(x){
+        unlist(lapply(ngrams(words(x), n), paste, collapse = " "), use.names = FALSE)}
+  tdm <- TermDocumentMatrix(corpus, control = list(tokenize = tokenizer, wordLengths=c(2,Inf)))
+  ngr <- data.frame(word = tdm$dimnames$Terms, frequency = tdm$v)
+  remove(tdm)
+  ngr <- arrange(ngr, -frequency)  
+  ngr$frequency <- ngr$frequency/sum(ngr$frequency)
+  ngr <- ngr[cover(ngr$frequency, p),]  
+  ngr}
+
+```
+
+```{r, include=FALSE}
+u <- getngrams(corp, 1)
+```
+
+```{r, include=FALSE}
+u <- data.table(u)
+names(u)[1]<-"w1"
+#u <- u[1:(nrow(u) * 0.3)]
+setkeyv(u, c("w1"))
+```
+
+```{r, eval=FALSE}
+save(u, file = "u.rda")
+```
+
+```{r, eval=FALSE}
+load(file = "u.rda")
+```
+
+```{r, include=FALSE}
+b <- getngrams(corp, 2)
+```
+
+```{r, include=FALSE}
+b<-data.table(b)
+b[, c("w1", "w2") := tstrsplit(word, " ", fixed=TRUE)]
+```
+
+```{r, include=FALSE}
+setkeyv(b, c("w1"))
+b[, S:=seq(.N), by=list(w1)]
+```
+
+```{r, include=FALSE}
+b <- b[S==1,.(w1,w2)]
+```
+
+```{r, eval=FALSE}
+save(b, file = "b.rda")
+```
+
+```{r, eval=FALSE}
+load(file = "b.rda")
+```
+
+```{r, include=FALSE}
+t <- getngrams(corp, 3)
+```
+
+```{r, include=FALSE}
+t <- data.table(t)
+t[, c("w1", "w2", "w3") := tstrsplit(word, " ", fixed=TRUE)]
+```
+
+```{r, include=FALSE}
+setkeyv(t, c("w1","w2"))
+t[, S:=seq(.N), by=list(w1, w2)]
+```
+
+```{r, include=FALSE}
+t <- t[S==1,.(w1,w2,w3)]
+```
+
+```{r, eval=FALSE}
+save(t, file = "t.rda")
+```
+
+```{r, eval=FALSE}
+load(file = "t.rda")
+```
+
+```{r, include=FALSE}
+f <- getngrams(corp, 4)
+```
+
+```{r, include=FALSE}
+f <- data.table(f)
+f[, c("w1", "w2", "w3", "w4") := tstrsplit(word, " ", fixed=TRUE)]
+```
+
+```{r, include=FALSE}
+setkeyv(f, c("w1","w2","w3"))
+f[, S:=seq(.N), by=list(w1, w2, w3)]
+```
+
+```{r, include=FALSE}
+f <- f[S==1,.(w1,w2,w3,w4)]
+```
+
+```{r, eval=FALSE}
+save(f, file = "f.rda")
+```
+
+```{r, eval=FALSE}
+load(file = "f.rda")
+```
+
+
+```{r, include=FALSE}
+
+by_f <-function (w) {print(paste("by_f", w));as.character(f[w1==w[1] & w2==w[2] & w3==w[3],.(w4)][1,])}
+by_t <-function (w) {print(paste("by_t", w));as.character(t[w1==w[1] & w2==w[2],.(w3)][1,])}
+by_b <-function (w) {print(paste("by_b", w));as.character(b[w1==w[1],.(w2)][1,])}
+by_u <-function (w) {print(paste("by_u", w));as.character(u[sample(1:nrow(u), 1),1])}
+back <- function (w) {print(length(w))
+  switch(ifelse(identical(w, character(0)),1,length(w)+1),
+                             by_u(w), by_b(w), by_t(w), by_f(w))}
+
+predict <- function (s = ""){
+if (s!=""){
+s <- tolower(s)
+s <- remove_online_junk(s)
+s <- split_shortforms(s)
+s <- remove_symbols(s)}
+w <- unlist(stri_extract_all_regex(s, "\\S+"))
+w <- tail(w,3)
+
+while (length(w)>=0){
+  result <- back(w)
+  if (is.na(result)){
+    w <- tail(w,length(w)-1)
+    #if (identical(w, character(0))) w <- NA
+  } else {break}
+}
+result}
+
+
+```
+
+
+
+
+.
