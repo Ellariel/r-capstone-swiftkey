@@ -16,7 +16,7 @@ This shiny app is introduced to show the simple model of Natural Language Proces
 The algorithm we reproduced is built on text corpora from some sources like twitter, blogs, news sites. So, It allows to predict next word which will be typed by user.
 
 
-author: D.V.
+author: Danila Valko
 
 
 date: 10/07/20
