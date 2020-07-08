@@ -1,0 +1,54 @@
+---
+title: 'Tiny SwiftKey: capstone project'
+output:
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Tiny SwiftKey keyboard
+
+This shiny app is introduced to show the simple model of Natural Language Processing for making the Smart Keyboard.
+
+The algorithm we reproduced is built on text corpora from some sources like twitter, blogs, news sites. So, It allows to predict next word which will be typed by user.
+
+
+author: D.V.
+
+
+date: 10/07/20
+
+## Algorithm
+
+The next word is guessed using the frequency of combinations of two, three and four words, which is known as N-gram model, with N=2,3,4.
+
+The algorithm try to use the higher N-gram, if it fails it uses the N-1 grams.
+
+If no one n-gram didn't match, it use random word from frequency word list.
+
+
+## Manual
+
+Wait dictionary load in ~5 sec.
+
+
+Enter some text and explore results in ~ 1 sec.
+
+
+Features:
+
+- Fast and memory efficient.
+- Mobile oriented.
+
+
+## Just try!
+
+
+http://ellariel.shinyapps.io/swiftkey/
+
+
+You can familiar with app.R in github: 
+http://github.com/ellariel/r-capstone-swiftkey

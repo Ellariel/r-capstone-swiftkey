@@ -1,0 +1,253 @@
+---
+title: "Text mining for SwiftKey: exploratory analysis"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+D.V. 06/07/20
+
+# Introduction
+
+This report will demonstrate the working with unstructured data for SwiftKey Capstone Project.
+The first step is an exploratory analysis - understanding the distribution of words and relationship between the words in the corpora.
+The second step is to understand frequencies of words and word pairs by building figures and tables.
+The raw data (en_US.blogs.txt, en_US.news.txt, en_US.tweets.txt) were extracted from [link](http://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
+Some profane words list (bad-words.txt) was downloaded from [link](http://www.freewebheaders.com/download/files/full-list-of-bad-words_text-file_2018_07_30.zip).
+
+
+# Questions to consider
+
+- Some words are more frequent than others - what are the distributions of word frequencies?
+- What are the frequencies of 2-grams and 3-grams in the dataset?
+- How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+- How do you evaluate how many of the words come from foreign languages?
+- Can you think of a way to increase the coverage - identifying words that may not be in the corpora or using a smaller number of words in the dictionary to cover the same number of phrases?
+
+
+```{r, warning=FALSE, message=FALSE, include=FALSE}
+library(tm)
+library(stringi)
+library(wordcloud)
+library(ggplot2)
+library(dplyr)
+Sys.setenv(JAVA_HOME="C:\\Program Files\\Java\\jdk1.8.0_251\\")
+library(RWeka)
+library(textmineR)
+```
+
+# Loading data
+
+```{r, warning=FALSE, cache=TRUE}
+#sample 10% data for each file 
+set.seed(1313)
+en_blogs <- readLines("en_US.blogs.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_blogs <- sample(en_blogs, NROW(en_blogs) * 0.1, replace = FALSE)
+```
+
+```{r, warning=FALSE, cache=TRUE}
+en_twitter <- readLines("en_US.twitter.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_twitter <- sample(en_twitter, NROW(en_twitter) * 0.1, replace = FALSE)
+```
+
+```{r, warning=FALSE, cache=TRUE}
+en_news <- readLines("en_US.news.txt", warn = FALSE, skipNul = TRUE, encoding = "UTF-8")
+en_news <- sample(en_news, NROW(en_news) * 0.1, replace = FALSE)
+```
+
+```{r, warning=FALSE, cache=TRUE}
+head(en_news, n=3)
+head(en_twitter, n=3)
+head(en_blogs, n=3)
+```
+
+```{r, warning=FALSE, cache=TRUE, include=FALSE}
+countgraph <- function (a, b, c){
+  data <- data.frame(cbind(
+    rbind(length(a), length(b), length(c)),
+    rbind(deparse(substitute(a)),deparse(substitute(b)),deparse(substitute(c)))))
+  ggplot(data, aes(data[,2], data[,1])) + xlab("") + ylab("") +
+    geom_bar(stat = "identity") + geom_text(aes(label = data[,1] ), vjust = -0.50, size = 5) + 
+    ggtitle(paste("Lines count")) + theme(axis.text.y=element_blank(), axis.ticks=element_blank())
+}
+```
+
+```{r, warning=FALSE, cache=TRUE}
+countgraph(en_news, en_twitter, en_blogs)
+```
+
+# Cleaning data
+Change to lower case, remove numbers, punctuations, white space, badwords and so one..
+
+```{r, cache=TRUE, include=FALSE}
+badwords <- readLines("bad-words.txt", skipNul = TRUE,warn = FALSE)
+#http://www.freewebheaders.com/full-list-of-bad-words-banned-by-google/
+```
+
+```{r, cache=TRUE}
+#remove words with non-ASCII characters and make corpus
+en_blogs_corp <- stri_trans_general(en_blogs, "latin-ascii")
+words <- unlist(strsplit(en_blogs_corp, split=", ")) # convert string to vector of words
+nonASCII <- grep("words", iconv(words, "latin1", "ASCII", sub="words")) #find indices non-ASCII characters
+en_blogs_corp <- paste(words[-nonASCII], collapse = ", ") #convert vector back to string
+en_blogs_corp <- VCorpus(VectorSource(list(en_blogs_corp)))#preparing corpus
+en_blogs_corp <- tm_map(en_blogs_corp, content_transformer(tolower))
+en_blogs_corp <- tm_map(en_blogs_corp, function(x) gsub("(ftp|http)(s?)://.*\\b", "", x))#URL
+en_blogs_corp <- tm_map(en_blogs_corp, function(x) gsub("\\b[a-z 0-9._ - ]*[@](.*?)[.]{1,3} \\b", "", x))#mail
+en_blogs_corp <- tm_map(en_blogs_corp, removeWords, c(stopwords('english'), badwords))
+en_blogs_corp <- tm_map(en_blogs_corp, removeNumbers)
+en_blogs_corp <- tm_map(en_blogs_corp, removePunctuation)
+en_blogs_corp <- tm_map(en_blogs_corp, stripWhitespace)
+en_blogs_corp <- tm_map(en_blogs_corp, PlainTextDocument)
+remove(en_blogs)
+```
+
+
+```{r, cache=TRUE}
+#remove words with non-ASCII characters and make corpus
+en_news_corp <- stri_trans_general(en_news, "latin-ascii")
+words <- unlist(strsplit(en_news_corp, split=", ")) # convert string to vector of words
+nonASCII <- grep("words", iconv(words, "latin1", "ASCII", sub="words")) #find indices non-ASCII characters
+en_news_corp <- paste(words[-nonASCII], collapse = ", ") #convert vector back to string
+en_news_corp <- VCorpus(VectorSource(list(en_news_corp)))#preparing corpus
+en_news_corp <- tm_map(en_news_corp, content_transformer(tolower))
+en_news_corp <- tm_map(en_news_corp, function(x) gsub("(ftp|http)(s?)://.*\\b", "", x))#URL
+en_news_corp <- tm_map(en_news_corp, function(x) gsub("\\b[a-z 0-9._ - ]*[@](.*?)[.]{1,3} \\b", "", x))#Email
+en_news_corp <- tm_map(en_news_corp, removeWords, c(stopwords('english'), badwords))
+en_news_corp <- tm_map(en_news_corp, removeNumbers)
+en_news_corp <- tm_map(en_news_corp, removePunctuation)
+en_news_corp <- tm_map(en_news_corp, stripWhitespace)
+en_news_corp <- tm_map(en_news_corp, PlainTextDocument)
+remove(en_news)
+```
+
+
+```{r, cache=TRUE}
+#remove words with non-ASCII characters and make corpus
+en_twitter_corp <- stri_trans_general(en_twitter, "latin-ascii") #preparing corpus
+words <- unlist(strsplit(en_twitter_corp, split=", ")) # convert string to vector of words
+nonASCII <- grep("words", iconv(words, "latin1", "ASCII", sub="words")) #find indices non-ASCII characters
+en_twitter_corp <- paste(words[-nonASCII], collapse = ", ") #convert vector back to string
+en_twitter_corp <- VCorpus(VectorSource(list(en_twitter_corp)))
+en_twitter_corp <- tm_map(en_twitter_corp, content_transformer(tolower))
+en_twitter_corp <- tm_map(en_twitter_corp, function(x) gsub("RT |via", "", x))#rem tags
+en_twitter_corp <- tm_map(en_twitter_corp, function(x) gsub("[@][a - zA - Z0 - 9_]{1,15}", "", x))#usernames
+en_twitter_corp <- tm_map(en_twitter_corp, function(x) gsub("(ftp|http)(s?)://.*\\b", "", x))#URL
+en_twitter_corp <- tm_map(en_twitter_corp, function(x) gsub("\\b[a-z 0-9._ - ]*[@](.*?)[.]{1,3} \\b", "", x))#mail
+en_twitter_corp <- tm_map(en_twitter_corp, function(x) gsub("#\\S+", "", x))#rem HashTags
+en_twitter_corp <- tm_map(en_twitter_corp, removeWords, c(stopwords('english'), badwords))
+en_twitter_corp <- tm_map(en_twitter_corp, removeNumbers)
+en_twitter_corp <- tm_map(en_twitter_corp, removePunctuation)
+en_twitter_corp <- tm_map(en_twitter_corp, stripWhitespace)
+en_twitter_corp <- tm_map(en_twitter_corp, PlainTextDocument)
+remove(en_twitter)
+```
+
+```{r, include=FALSE}
+remove(nonASCII)
+remove(words)
+```
+
+# Visualizing words
+
+```{r, include=FALSE}
+wordsgraph <- function (corpus) {
+  words <- as.matrix(DocumentTermMatrix(corpus))
+  words_freq <- sort(colSums(words), decreasing = TRUE)
+  words_freq <- data.frame(word = names(words_freq), frequency = words_freq)
+  totalwords <- sum(words_freq$frequency)
+  words_freq <- words_freq[1:20,]
+  par(mfrow=c(1,2), mar=c(6,3,3,2))
+  words_freq<- words_freq[order(words_freq[,2], decreasing=FALSE),]
+  plot <- barplot(words_freq$frequency, las = 1, names.arg = words_freq$word, xlab = "frequency",
+        yaxt = 'n', ylab = '', col ="gray", horiz=TRUE, 
+        main = paste0("Top-20 words: ", deparse(substitute(corpus)), "\ntotal: ",totalwords," words"))
+  text(x = words_freq$frequency, y = plot , label = words_freq$frequency, pos = 2, cex = 0.7)
+  axis(2, at=plot, labels=words_freq$word, tick=FALSE, las=2, line=-0.5, cex.axis=0.7)
+  wordcloud(words_freq$word, words_freq$frequency, random.order=FALSE,
+          colors = brewer.pal(8, "Dark2")) 
+  #ggplot(words_freq, aes(x = reorder(word, frequency), y = frequency)) + xlab("word") +
+  #  geom_bar(stat = "identity") + coord_flip() + 
+  #  ggtitle(paste("Top-20 words:", deparse(substitute(corpus))))
+  }
+```
+
+
+```{r, cache=TRUE}
+wordsgraph(en_news_corp)
+wordsgraph(en_twitter_corp)
+wordsgraph(en_blogs_corp)
+```
+
+
+# Making N-Grams
+
+```{r, include=FALSE}
+BigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+TrigramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+FourgramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+```
+
+
+```{r, include=FALSE}
+getngrams <- function (corpus, tokenizer) {
+  tdm <- TermDocumentMatrix(corpus, control = list(tokenize = tokenizer))
+  ngrams <- data.frame(word = tdm$dimnames$Terms, frequency = tdm$v)
+  ngrams <- arrange(ngrams, -frequency)
+  }
+```
+
+
+```{r, cache=TRUE}
+en_news_bigram <- getngrams(en_news_corp, BigramTokenizer)
+en_news_trigram <- getngrams(en_news_corp, TrigramTokenizer)
+en_news_fourgram <- getngrams(en_news_corp, FourgramTokenizer)
+
+en_twitter_bigram <- getngrams(en_twitter_corp, BigramTokenizer)
+en_twitter_trigram <- getngrams(en_twitter_corp, TrigramTokenizer)
+en_twitter_fourgram <- getngrams(en_twitter_corp, FourgramTokenizer)
+
+en_blogs_bigram <- getngrams(en_blogs_corp, BigramTokenizer)
+en_blogs_trigram <- getngrams(en_blogs_corp, TrigramTokenizer)
+en_blogs_fourgram <- getngrams(en_blogs_corp, FourgramTokenizer)
+
+```
+
+# Visualizing N-Grams
+
+```{r, include=FALSE}
+ngramgraph <- function (ngr) {
+  ggplot(ngr[1:10,], aes(x = reorder(word, -frequency), y = frequency)) + xlab("ngram") +
+    geom_bar(stat = "identity") + theme (axis.text.x = element_text(angle = 45, hjust = 1)) +
+    geom_text(aes(label = frequency ), vjust = -0.20, size = 3) + 
+    ggtitle(paste("Top-10", deparse(substitute(ngr))))
+  }
+```
+
+
+```{r}
+ngramgraph(en_news_bigram)
+ngramgraph(en_news_trigram)
+
+ngramgraph(en_twitter_bigram)
+ngramgraph(en_twitter_trigram)
+
+ngramgraph(en_blogs_bigram)
+ngramgraph(en_blogs_trigram)
+```
+
+
+# Conclusion
+So, we analyse only 10% sample (because of hardware limitations) of the entire corpus and remove numbers, punctuations, badwords, etc. from them.
+As we can see at figures the most frequent one-gram words are 'one', 'just', 'said.' In the digrams, 'company said', 'right now', and 'even though' are the top 3 most frequent consequitive words. In the tri-grams, 'points national average', 'happy mothers day', and 'actions people feel' come on top.
+
+Our n-gram data can be used for to construct prediction model that predict next word based on n-gram frequences.
+We consider that it needs to be used about 3 top-frequncy n-grams of each frequent word.
+As far as we know according to the Zipf principle (1935), we should keep ~20% from top-frequent n-grams for covering at about 80% of the usual sentences (word instances). 
+
+P.S.
+
+- For future prediction model building we are going to use 30%-random sample of our text corpora.
+- RMD file with all code blocks (first.rmd) you can obtain at http://github.com/ellariel/r-capstone-swiftkey
+
+.

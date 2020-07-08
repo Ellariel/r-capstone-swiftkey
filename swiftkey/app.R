@@ -56,20 +56,20 @@ predict <- function (s = ""){
     result}
 
 # Load data
-load(file = "dict\\u.rda")
-#load(file = "./dict/b.rda")
-#load(file = "./dict/t.rda")
-#load(file = "./dict/f.rda")
-
+load(file = "u.rda")
+load(file = "b.rda")
+load(file = "t.rda")
+load(file = "f.rda")
 
 ui <- fluidPage(
-    titlePanel("Some word predictor :)"),
+    titlePanel("Tiny SwiftKey ^_^''"),
 
     sidebarLayout(
         sidebarPanel(
             textInput("input", "Your text:", ""),
             verbatimTextOutput("value"),
-            h6("You can familiar with ui.R and server.R in github: ",a(href="http://github.com/ellariel/r-capstone-swiftkey", "github.com/ellariel/r-capstone-swiftkey"))
+            h6("Please check the manual: ",a(href="http://rpubs.com/Ellariel/swiftkey-pitch", "rpubs.com/ellariel/swiftkey-pitch")),
+            h6("You can familiar with app.R in github: ",a(href="http://github.com/ellariel/r-capstone-swiftkey", "github.com/ellariel/r-capstone-swiftkey"))
         ),
 
         mainPanel(
@@ -82,7 +82,8 @@ ui <- fluidPage(
 server <- function(input, output) {
     #predict
     pred <- reactive({
-        predict(input$input)
+        if (input$input != "")
+         predict(input$input)
     })
     
     #print
